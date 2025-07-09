@@ -3,46 +3,59 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>All Cameras Preview</title>
+  <title>Capture Card Viewer</title>
   <style>
     body {
       font-family: sans-serif;
+      background: #111;
+      color: #fff;
+      margin: 0;
       padding: 20px;
-      background: #fafafa;
+      text-align: center;
     }
     h1 {
-      text-align: center;
+      margin-bottom: 20px;
     }
     .video-grid {
       display: flex;
       flex-wrap: wrap;
-      gap: 16px;
       justify-content: center;
+      gap: 20px;
     }
     .camera {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      border: 2px solid #ccc;
+      background: #222;
+      border: 2px solid #444;
       border-radius: 10px;
       padding: 10px;
-      background: #fff;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      max-width: 340px;
     }
     .camera video {
-      width: 300px;
-      height: auto;
+      width: 100%;
       border-radius: 8px;
+      cursor: pointer;
     }
     .label {
       margin-top: 8px;
       font-weight: bold;
       font-size: 14px;
     }
+    button {
+      margin: 6px 4px 0;
+      padding: 6px 12px;
+      font-size: 14px;
+      background: #444;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #666;
+    }
   </style>
 </head>
 <body>
-  <h1>Live Camera Previews</h1>
+  <h1>Capture Card Viewer</h1>
   <div class="video-grid" id="videoGrid"></div>
 
   <script>
@@ -50,7 +63,7 @@
 
     async function getAllVideoStreams() {
       try {
-        // First call to trigger permissions and get labels
+        // Initial permission
         await navigator.mediaDevices.getUserMedia({ video: true });
 
         const devices = await navigator.mediaDevices.enumerateDevices();
@@ -59,10 +72,10 @@
         for (let i = 0; i < videoInputs.length; i++) {
           const device = videoInputs[i];
 
-          // Try to access each device in sequence
           try {
             const stream = await navigator.mediaDevices.getUserMedia({
-              video: { deviceId: device.deviceId ? { exact: device.deviceId } : undefined }
+              video: { deviceId: device.deviceId ? { exact: device.deviceId } : undefined },
+              audio: false
             });
 
             const wrapper = document.createElement('div');
@@ -73,12 +86,69 @@
             video.playsInline = true;
             video.srcObject = stream;
 
+            // FULLSCREEN on double-click
+            video.ondblclick = () => {
+              if (document.fullscreenElement) {
+                document.exitFullscreen();
+              } else {
+                video.requestFullscreen();
+              }
+            };
+
             const label = document.createElement('div');
             label.className = 'label';
             label.textContent = device.label || `Camera ${i + 1}`;
 
+            // --- RECORD BUTTON ---
+            let mediaRecorder;
+            let chunks = [];
+            const recordBtn = document.createElement('button');
+            recordBtn.textContent = 'Start Recording';
+
+            recordBtn.onclick = () => {
+              if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+                chunks = [];
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = e => chunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                  const blob = new Blob(chunks, { type: 'video/webm' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${label.textContent.replace(/\s+/g, '_')}.webm`;
+                  a.click();
+                };
+                mediaRecorder.start();
+                recordBtn.textContent = 'Stop Recording';
+              } else {
+                mediaRecorder.stop();
+                recordBtn.textContent = 'Start Recording';
+              }
+            };
+
+            // --- SCREENSHOT BUTTON ---
+            const screenshotBtn = document.createElement('button');
+            screenshotBtn.textContent = 'Screenshot';
+            screenshotBtn.onclick = () => {
+              const canvas = document.createElement('canvas');
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(video, 0, 0);
+              canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${label.textContent.replace(/\s+/g, '_')}.png`;
+                a.click();
+              });
+            };
+
+            // Append everything
             wrapper.appendChild(video);
             wrapper.appendChild(label);
+            wrapper.appendChild(recordBtn);
+            wrapper.appendChild(screenshotBtn);
             videoGrid.appendChild(wrapper);
           } catch (err) {
             console.warn(`Could not open camera ${i}:`, err.name);
