@@ -63,7 +63,7 @@
 
     async function getAllVideoStreams() {
       try {
-        // Initial permission
+        // Initial permissions
         await navigator.mediaDevices.getUserMedia({ video: true });
 
         const devices = await navigator.mediaDevices.enumerateDevices();
@@ -74,8 +74,8 @@
 
           try {
             const stream = await navigator.mediaDevices.getUserMedia({
-              video: { deviceId: device.deviceId ? { exact: device.deviceId } : undefined },
-              audio: false
+              video: { deviceId: { exact: device.deviceId } },
+              audio: true // include audio in case available
             });
 
             const wrapper = document.createElement('div');
@@ -84,9 +84,10 @@
             const video = document.createElement('video');
             video.autoplay = true;
             video.playsInline = true;
+            video.muted = true; // start muted to prevent feedback
             video.srcObject = stream;
 
-            // FULLSCREEN on double-click
+            // Fullscreen on double-click
             video.ondblclick = () => {
               if (document.fullscreenElement) {
                 document.exitFullscreen();
@@ -99,7 +100,7 @@
             label.className = 'label';
             label.textContent = device.label || `Camera ${i + 1}`;
 
-            // --- RECORD BUTTON ---
+            // --- Record Button ---
             let mediaRecorder;
             let chunks = [];
             const recordBtn = document.createElement('button');
@@ -126,7 +127,7 @@
               }
             };
 
-            // --- SCREENSHOT BUTTON ---
+            // --- Screenshot Button ---
             const screenshotBtn = document.createElement('button');
             screenshotBtn.textContent = 'Screenshot';
             screenshotBtn.onclick = () => {
@@ -144,11 +145,21 @@
               });
             };
 
-            // Append everything
+            // --- Toggle Mute Button ---
+            const muteBtn = document.createElement('button');
+            muteBtn.textContent = 'Unmute';
+
+            muteBtn.onclick = () => {
+              video.muted = !video.muted;
+              muteBtn.textContent = video.muted ? 'Unmute' : 'Mute';
+            };
+
+            // Append to layout
             wrapper.appendChild(video);
             wrapper.appendChild(label);
             wrapper.appendChild(recordBtn);
             wrapper.appendChild(screenshotBtn);
+            wrapper.appendChild(muteBtn);
             videoGrid.appendChild(wrapper);
           } catch (err) {
             console.warn(`Could not open camera ${i}:`, err.name);
