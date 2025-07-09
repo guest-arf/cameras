@@ -50,36 +50,43 @@
 
     async function getAllVideoStreams() {
       try {
+        // First call to trigger permissions and get labels
+        await navigator.mediaDevices.getUserMedia({ video: true });
+
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoInputs = devices.filter(d => d.kind === 'videoinput');
 
         for (let i = 0; i < videoInputs.length; i++) {
           const device = videoInputs[i];
 
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { deviceId: { exact: device.deviceId } },
-            audio: false
-          });
+          // Try to access each device in sequence
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: { deviceId: device.deviceId ? { exact: device.deviceId } : undefined }
+            });
 
-          const wrapper = document.createElement('div');
-          wrapper.className = 'camera';
+            const wrapper = document.createElement('div');
+            wrapper.className = 'camera';
 
-          const video = document.createElement('video');
-          video.autoplay = true;
-          video.playsInline = true;
-          video.srcObject = stream;
+            const video = document.createElement('video');
+            video.autoplay = true;
+            video.playsInline = true;
+            video.srcObject = stream;
 
-          const label = document.createElement('div');
-          label.className = 'label';
-          label.textContent = device.label || `Camera ${i + 1}`;
+            const label = document.createElement('div');
+            label.className = 'label';
+            label.textContent = device.label || `Camera ${i + 1}`;
 
-          wrapper.appendChild(video);
-          wrapper.appendChild(label);
-          videoGrid.appendChild(wrapper);
+            wrapper.appendChild(video);
+            wrapper.appendChild(label);
+            videoGrid.appendChild(wrapper);
+          } catch (err) {
+            console.warn(`Could not open camera ${i}:`, err.name);
+          }
         }
       } catch (err) {
         console.error('Error accessing video devices:', err);
-        alert('Error accessing video devices. Make sure to allow camera access and use HTTPS or localhost.');
+        alert('Please allow camera access and reload the page.');
       }
     }
 
